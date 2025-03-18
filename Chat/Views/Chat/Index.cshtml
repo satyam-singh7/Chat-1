@@ -1,0 +1,174 @@
+﻿@{
+    ViewData["Title"] = "Chat Room";
+}
+
+<h2 class="text-center my-3">Chat Room</h2>
+<p class="text-center">Welcome, <strong>@ViewBag.Username</strong></p>
+
+<div class="container">
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Messages</h5>
+        </div>
+        <div class="card-body chat-container" style="max-height: 400px; overflow-y: auto;">
+            <ul id="messagesList" class="list-unstyled">
+                @if (ViewBag.Messages != null)
+                {
+                    @foreach (var msg in ViewBag.Messages)
+                    {
+                                <li class="media my-3 p-3 border rounded shadow-sm">
+                                    <div class="media-body">
+                                        <h6 class="font-weight-bold text-primary">@msg.Sender</h6>
+                                        <p class="mb-1">@msg.Message</p>
+
+                                @if (!string.IsNullOrEmpty(msg.MediaUrl))
+                                {
+                                    if (msg.MediaUrl.EndsWith(".mp4") || msg.MediaUrl.EndsWith(".webm") || msg.MediaUrl.EndsWith(".ogg"))
+                                    {
+                                                        <video controls class="w-100 mt-2 rounded">
+                                                            <source src="@msg.MediaUrl" type="video/mp4">
+                                                        </video>
+                                    }
+                                    else if (msg.MediaUrl.EndsWith(".jpeg") || msg.MediaUrl.EndsWith(".jpg") || msg.MediaUrl.EndsWith(".png") || msg.MediaUrl.EndsWith(".gif"))
+                                    {
+                                                        <img src="@msg.MediaUrl" class="img-fluid mt-2 rounded shadow-sm" style="max-width: 200px;" />
+                                    }
+                                    else
+                                    {
+                                                        <a href="@msg.MediaUrl" class="btn btn-link mt-2" target="_blank">Download File</a>
+                                    }
+                                }
+                                    </div>
+                                </li>
+                    }
+                }
+            </ul>
+        </div>
+    </div>
+
+    <div class="card mt-3">
+        <div class="card-body">
+            <div class="input-group">
+                <input type="text" id="messageInput" class="form-control" placeholder="Type a message..." />
+                <div class="input-group-append">
+                    <button class="btn btn-primary" onclick="sendMessage()">
+                        <i class="fas fa-paper-plane"></i> Send
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/5.0.11/signalr.min.js"></script>
+<script>
+    var username = "@(ViewBag.Username ?? "Guest")";
+    var groupName = "Group1";
+    var connection = new signalR.HubConnectionBuilder().withUrl("/chathub").build();
+
+    connection.start().then(function () {
+        console.log("Connected to chat.");
+        connection.invoke("JoinGroup", groupName, username)
+            .catch(err => console.error("Error joining group:", err));
+    }).catch(function (err) {
+        console.error("Connection error:", err);
+    });
+
+    function sendMessage() {
+        var messageInput = document.getElementById("messageInput");
+        var message = messageInput.value.trim();
+        var language = "Hindi"; // Language for translation
+
+        if (!message) {
+            alert("Message is required.");
+            return;
+        }
+
+        // Send the original message
+        connection.invoke("SendMessage", groupName, username, message, "")
+            .then(() => {
+                console.log("Message sent successfully.");
+                messageInput.value = "";
+
+                // Translate the message
+                fetch(`/api/translate/text?text=${encodeURIComponent(message)}&language=${encodeURIComponent(language)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.translatedText) {
+                            // Display the translated message in the UI
+                            var messagesList = document.getElementById("messagesList");
+                            var listItem = document.createElement("li");
+                            listItem.className = "media my-3 p-3 border rounded shadow-sm";
+                            listItem.innerHTML = `<div class="media-body">
+                                <h6 class="font-weight-bold text-primary"> Gemini Translator </h6>
+                                <p class="mb-1">${data.translatedText}</p>
+                            </div>`;
+                            messagesList.appendChild(listItem);
+                        } else {
+                            alert("Translation failed.");
+                        }
+                    })
+                    .catch(error => {
+                        console.error("Error translating text:", error);
+                        alert("Error translating text.");
+                    });
+            })
+            .catch(err => {
+                console.error("Error sending message:", err);
+                alert("Failed to send message.");
+            });
+    }
+
+    connection.on("ReceiveMessage", function (sender, message, mediaUrl) {
+        var messagesList = document.getElementById("messagesList");
+        var listItem = document.createElement("li");
+        listItem.className = "media my-3 p-3 border rounded shadow-sm";
+        listItem.innerHTML = `<div class="media-body">
+            <h6 class="font-weight-bold text-primary">${sender}</h6>
+            <p class="mb-1">${message}</p>`;
+
+        if (mediaUrl) {
+            if (mediaUrl.endsWith(".mp4") || mediaUrl.endsWith(".webm") || mediaUrl.endsWith(".ogg")) {
+                listItem.innerHTML += `<br><video controls class="w-100 mt-2 rounded">
+                    <source src="${mediaUrl}" type="video/mp4">
+                </video>`;
+            } else if (mediaUrl.match(/\.(jpeg|jpg|png|gif)$/i)) {
+                listItem.innerHTML += `<br><img src="${mediaUrl}" class="img-fluid mt-2 rounded shadow-sm" style="max-width: 200px;" />`;
+            } else {
+                listItem.innerHTML += `<br><a href="${mediaUrl}" class="btn btn-link mt-2" target="_blank">Download File</a>`;
+            }
+        }
+
+        listItem.innerHTML += `</div>`;
+        messagesList.appendChild(listItem);
+    });
+
+    connection.on("LoadChatHistory", function (messages) {
+        var messagesList = document.getElementById("messagesList");
+        messagesList.innerHTML = "";
+
+        messages.forEach(msg => {
+            var listItem = document.createElement("li");
+            listItem.className = "media my-3 p-3 border rounded shadow-sm";
+            listItem.innerHTML = `<div class="media-body">
+                <h6 class="font-weight-bold text-primary">${msg.sender}</h6>
+                <p class="mb-1">${msg.message}</p>`;
+
+            if (msg.mediaUrl) {
+                if (msg.mediaUrl.endsWith(".mp4") || msg.mediaUrl.endsWith(".webm") || msg.mediaUrl.endsWith(".ogg")) {
+                    listItem.innerHTML += `<br><video controls class="w-100 mt-2 rounded">
+                        <source src="${msg.mediaUrl}" type="video/mp4">
+                    </video>`;
+                } else if (msg.mediaUrl.match(/\.(jpeg|jpg|png|gif)$/i)) {
+                    listItem.innerHTML += `<br><img src="${msg.mediaUrl}" class="img-fluid mt-2 rounded shadow-sm" style="max-width: 200px;" />`;
+                } else {
+                    listItem.innerHTML += `<br><a href="${msg.mediaUrl}" class="btn btn-link mt-2" target="_blank">Download File</a>`;
+                }
+            }
+
+            listItem.innerHTML += `</div>`;
+            messagesList.appendChild(listItem);
+        });
+    });
+</script>
+

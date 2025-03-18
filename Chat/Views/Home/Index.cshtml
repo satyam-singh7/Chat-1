@@ -1,0 +1,18 @@
+﻿@{
+    ViewData["Title"] = "Home";
+}
+
+<h2>Welcome to the Chat App</h2>
+
+@if (ViewBag.UserRole == "Admin")
+{
+    <p>You are logged in as an <strong>Admin</strong>.</p>
+}
+else
+{
+    <p>You are logged in as a <strong>User</strong>.</p>
+}
+
+<a href="@Url.Action("Index", "Chat")">Go to Chat</a> |
+@* <a href="@Url.Action("Index", "Group")">Manage Groups</a>  *@|
+<a href="@Url.Action("Logout", "Account")">Logout</a>

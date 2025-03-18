@@ -1,0 +1,29 @@
+﻿@* @{
+    ViewData["Title"] = "Groups";
+}
+
+<h2>Manage Chat Groups</h2>
+
+<form method="post" asp-controller="Group" asp-action="CreateGroup">
+    <input type="text" name="groupName" placeholder="Enter group name" required />
+    <button type="submit">Create Group</button>
+</form>
+
+<h3>Available Groups</h3>
+<ul>
+    @foreach (var group in Model)
+    {
+        <li>
+            @group.Name
+            <form method="post" asp-controller="Group" asp-action="JoinGroup">
+                <input type="hidden" name="groupId" value="@group.Id" />
+                <button type="submit">Join</button>
+            </form>
+        </li>
+    }
+</ul>
+
+<a href="@Url.Action("Index", "Chat")">Go to Chat</a> |
+<a href="@Url.Action("Logout", "Account")">Logout</a>
+
+ *@

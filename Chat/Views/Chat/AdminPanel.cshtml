@@ -1,0 +1,31 @@
+﻿@model List<Chat.Models.User>
+
+@{
+    ViewData["Title"] = "Admin Panel - Users";
+}
+
+<h2>All Registered Users</h2>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Username</th>
+            <th>Role</th>
+            <th>Action</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var user in Model)
+        {
+            <tr>
+                <td>@user.Id</td>
+                <td>@user.Username</td>
+                <td>@user.Role</td>
+                <td>
+                    <a href="@Url.Action("Index", "Chat", new { userId = user.Id })" class="btn btn-primary">Message</a>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
