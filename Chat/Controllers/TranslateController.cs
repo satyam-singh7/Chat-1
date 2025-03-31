@@ -25,46 +25,58 @@ public class TranslateController : ControllerBase
         return Ok(languages);
     }
 
-    
+
     [HttpGet("text")]
     public async Task<IActionResult> Translate([FromQuery] string text, [FromQuery] string language)
     {
-        text = text + " ....  Strictly give the meniing in hindi nothing else ";
         if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(language))
             return BadRequest("Text and language parameters are required.");
 
-        // Prepare the request body to send to the Gemini API
+        // Append instruction for accuracy
+        text += $" (Translate this strictly into {language} without extra words)";
+
         var requestBody = new
         {
             contents = new[]
             {
-            new
-            {
-                parts = new[]
+                new
                 {
-                    new { text = $"Translate this to {language}: {text}" }
+                    parts = new[]
+                    {
+                        new { text = $"Translate this to {language}: {text}" }
+                    }
                 }
             }
-        }
         };
 
         var json = JsonSerializer.Serialize(requestBody);
         var requestContent = new StringContent(json, Encoding.UTF8, "application/json");
 
-        // Use the Gemini API key (make sure to replace "YOUR_GEMINI_API_KEY" with your actual API key)
-        var geminiApiKey = "AIzaSyB6-c_McEt5IV0orQPOBvdL1UvPjzY1AoA"; // Replace this with your Gemini API key
+        string geminiApiKey = "AIzaSyB6-c_McEt5IV0orQPOBvdL1UvPjzY1AoA"; // Ensure this is correct
         var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={geminiApiKey}";
-
-        // Make the request to Gemini API
-        var response = await _httpClient.PostAsync(url, requestContent);
-        var responseString = await response.Content.ReadAsStringAsync();
 
 
         try
         {
+            var response = await _httpClient.PostAsync(url, requestContent);
+            var responseString = await response.Content.ReadAsStringAsync();
+
+            // Debug: Print full response in logs
+            Console.WriteLine("API Response: " + responseString);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                return StatusCode((int)response.StatusCode, $"API Error: {responseString}");
+            }
+
+            // Parse API response safely
             using JsonDocument doc = JsonDocument.Parse(responseString);
-            var translatedText = doc.RootElement
-                .GetProperty("candidates")[0]
+            if (!doc.RootElement.TryGetProperty("candidates", out JsonElement candidates) || candidates.GetArrayLength() == 0)
+            {
+                return BadRequest("Invalid API response structure.");
+            }
+
+            var translatedText = candidates[0]
                 .GetProperty("content")
                 .GetProperty("parts")[0]
                 .GetProperty("text")
@@ -72,16 +84,14 @@ public class TranslateController : ControllerBase
 
             return Ok(new { translatedText });
         }
-        catch (JsonException ex)
+        catch (HttpRequestException httpEx)
         {
-            return BadRequest($"JSON Parsing Error: {ex.Message}");
+            return StatusCode(500, $"HTTP Request Error: {httpEx.Message}");
         }
-
-        //// Parse the response and extract the translated text
-        //using JsonDocument doc = JsonDocument.Parse(responseString);
-        //string translatedText = doc.RootElement.GetProperty("contents")[0].GetProperty("parts")[0].GetProperty("text").GetString();
-
-        //return Ok(new { translatedText });
+        catch (JsonException jsonEx)
+        {
+            return BadRequest($"JSON Parsing Error: {jsonEx.Message}");
+        }
     }
 
 }

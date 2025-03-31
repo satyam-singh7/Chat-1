@@ -48,7 +48,19 @@
 
     <div class="card mt-3">
         <div class="card-body">
-            <div class="input-group">
+            <div class="form-group">
+                <label for="languageSelect"><strong>Select Language:</strong></label>
+                <select id="languageSelect" class="form-control">
+                    <option value="en">English</option>
+                    <option value="hi">Hindi</option>
+                    <option value="fr">French</option>
+                    <option value="es">Spanish</option>
+                    <option value="de">German</option>
+                    <option value="zh">Chinese</option>
+                </select>
+            </div>
+
+            <div class="input-group mt-2">
                 <input type="text" id="messageInput" class="form-control" placeholder="Type a message..." />
                 <div class="input-group-append">
                     <button class="btn btn-primary" onclick="sendMessage()">
@@ -58,7 +70,7 @@
             </div>
         </div>
     </div>
-</div>
+
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/5.0.11/signalr.min.js"></script>
 <script>
@@ -74,74 +86,110 @@
         console.error("Connection error:", err);
     });
 
-    function sendMessage() {
-        var messageInput = document.getElementById("messageInput");
-        var message = messageInput.value.trim();
-        var language = "Hindi"; // Language for translation
+            function sendMessage() {
+            var messageInput = document.getElementById("messageInput");
+            var languageSelect = document.getElementById("languageSelect"); // Get selected language
+            var message = messageInput.value.trim();
+            var selectedLanguage = languageSelect.value;
 
-        if (!message) {
-            alert("Message is required.");
-            return;
-        }
-
-        // Send the original message
-        connection.invoke("SendMessage", groupName, username, message, "")
-            .then(() => {
-                console.log("Message sent successfully.");
-                messageInput.value = "";
-
-                // Translate the message
-                fetch(`/api/translate/text?text=${encodeURIComponent(message)}&language=${encodeURIComponent(language)}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.translatedText) {
-                            // Display the translated message in the UI
-                            var messagesList = document.getElementById("messagesList");
-                            var listItem = document.createElement("li");
-                            listItem.className = "media my-3 p-3 border rounded shadow-sm";
-                            listItem.innerHTML = `<div class="media-body">
-                                <h6 class="font-weight-bold text-primary"> Gemini Translator </h6>
-                                <p class="mb-1">${data.translatedText}</p>
-                            </div>`;
-                            messagesList.appendChild(listItem);
-                        } else {
-                            alert("Translation failed.");
-                        }
-                    })
-                    .catch(error => {
-                        console.error("Error translating text:", error);
-                        alert("Error translating text.");
-                    });
-            })
-            .catch(err => {
-                console.error("Error sending message:", err);
-                alert("Failed to send message.");
-            });
-    }
-
-    connection.on("ReceiveMessage", function (sender, message, mediaUrl) {
-        var messagesList = document.getElementById("messagesList");
-        var listItem = document.createElement("li");
-        listItem.className = "media my-3 p-3 border rounded shadow-sm";
-        listItem.innerHTML = `<div class="media-body">
-            <h6 class="font-weight-bold text-primary">${sender}</h6>
-            <p class="mb-1">${message}</p>`;
-
-        if (mediaUrl) {
-            if (mediaUrl.endsWith(".mp4") || mediaUrl.endsWith(".webm") || mediaUrl.endsWith(".ogg")) {
-                listItem.innerHTML += `<br><video controls class="w-100 mt-2 rounded">
-                    <source src="${mediaUrl}" type="video/mp4">
-                </video>`;
-            } else if (mediaUrl.match(/\.(jpeg|jpg|png|gif)$/i)) {
-                listItem.innerHTML += `<br><img src="${mediaUrl}" class="img-fluid mt-2 rounded shadow-sm" style="max-width: 200px;" />`;
-            } else {
-                listItem.innerHTML += `<br><a href="${mediaUrl}" class="btn btn-link mt-2" target="_blank">Download File</a>`;
+            if (!message) {
+                alert("Message is required.");
+                return;
             }
+
+            // Send the original message first
+            connection.invoke("SendMessage", groupName, username, message, "")
+                .then(() => {
+                    console.log("Message sent successfully.");
+                    messageInput.value = "";
+
+                    // Translate the message
+                    fetch(`/api/translate/text?text=${encodeURIComponent(message)}&language=${encodeURIComponent(selectedLanguage)}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.translatedText) {
+                                var messagesList = document.getElementById("messagesList");
+                                var listItem = document.createElement("li");
+                                listItem.className = "media my-3 p-3 border rounded shadow-sm";
+                                // listItem.innerHTML = `<div class="media-body">
+                                //     <h6 class="font-weight-bold text-primary">Gemini Translator</h6>
+                                //     <p class="mb-1"><strong>Original:</strong> ${message}</p>
+                                //     <p class="mb-1 text-success"><strong>Translated (${selectedLanguage.toUpperCase()}):</strong> ${data.translatedText}</p>
+                                // </div>`;
+                                messagesList.appendChild(listItem);
+                            } else {
+                                alert("Translation failed.");
+                            }
+                        })
+                        .catch(error => {
+                            console.error("Error translating text:", error);
+                            alert("Error translating text.");
+                        });
+                })
+                .catch(err => {
+                    console.error("Error sending message:", err);
+                    alert("Failed to send message.");
+                });
         }
 
-        listItem.innerHTML += `</div>`;
-        messagesList.appendChild(listItem);
-    });
+
+                   connection.on("ReceiveMessage", function (sender, message, mediaUrl) {
+            var messagesList = document.getElementById("messagesList");
+            var listItem = document.createElement("li");
+            listItem.className = "media my-3 p-3 border rounded shadow-sm";
+
+            // Basic message structure
+            var messageContent = `
+                <div class="media-body">
+                    <h6 class="font-weight-bold text-primary">${sender}</h6>
+                    <p class="mb-1"><strong>Original:</strong> ${message}</p>`;
+
+            // Append media if present
+            if (mediaUrl) {
+                if (mediaUrl.match(/\.(mp4|webm|ogg)$/i)) {
+                    messageContent += `<br><video controls class="w-100 mt-2 rounded">
+                        <source src="${mediaUrl}" type="video/mp4">
+                    </video>`;
+                } else if (mediaUrl.match(/\.(jpeg|jpg|png|gif)$/i)) {
+                    messageContent += `<br><img src="${mediaUrl}" class="img-fluid mt-2 rounded shadow-sm" style="max-width: 200px;" />`;
+                } else {
+                    messageContent += `<br><a href="${mediaUrl}" class="btn btn-link mt-2" target="_blank">Download File</a>`;
+                }
+            }
+
+            messageContent += `</div>`;
+            listItem.innerHTML = messageContent;
+            messagesList.appendChild(listItem);
+
+            // Get the selected language for translation
+            var selectedLanguage = document.getElementById("languageSelect").value;
+
+            // Perform translation asynchronously
+            fetch(`/api/translate/text?text=${encodeURIComponent(message)}&language=${encodeURIComponent(selectedLanguage)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.translatedText) {
+                        let translationElement = document.createElement("p");
+                        translationElement.className = "mb-1 text-success";
+                        translationElement.innerHTML = `<strong>Translated (${selectedLanguage.toUpperCase()}):</strong> ${data.translatedText}`;
+                        listItem.querySelector(".media-body").appendChild(translationElement);
+                    } else {
+                        let errorElement = document.createElement("p");
+                        errorElement.className = "mb-1 text-danger";
+                        errorElement.textContent = "Translation failed";
+                        listItem.querySelector(".media-body").appendChild(errorElement);
+                    }
+                })
+                .catch(error => {
+                    console.error("Error translating text:", error);
+                    let errorElement = document.createElement("p");
+                    errorElement.className = "mb-1 text-danger";
+                    errorElement.textContent = "Error fetching translation";
+                    listItem.querySelector(".media-body").appendChild(errorElement);
+                });
+        });
+
+
 
     connection.on("LoadChatHistory", function (messages) {
         var messagesList = document.getElementById("messagesList");
@@ -171,4 +219,5 @@
         });
     });
 </script>
+
 
